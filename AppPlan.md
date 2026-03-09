@@ -1,168 +1,324 @@
 # Driving License Test Practice App - Project Plan (.NET 10 / C#)
 
 ## 1) Product Goal
-Build a cross-platform study app that helps users prepare for a driving knowledge exam by taking timed or untimed multiple-choice practice tests, reviewing results, and tracking progress over time.
+Build a lightweight **web portal** that helps users prepare for a driving knowledge exam by taking randomized multiple-choice practice tests, reviewing results, and optionally tracking attempts.
 
-## 2) Scope
-### Core (MVP)
+The system is implemented using **ASP.NET Core MVC** with session-based test state.
+
+---
+
+# 2) Scope
+
+## Core
 - Start a practice test from the home screen.
-- Ask 20-30 random multiple-choice questions per attempt.
-- Navigate between questions (next, previous, jump to index).
-- Persist answers during a test session.
-- Submit test and display score + pass/fail summary.
-- Use mock/local question source first (JSON/in-memory).
+- Ask **20–30 random multiple-choice questions** per attempt.
+- Navigate between questions (next / previous).
+- Persist answers during the test session using **server session state**.
+- Submit test and display:
+  - Score
+  - Percentage
+  - Incorrect answers with correct solution.
+- Use **JSON-based question source** initially.
 
-### Phase 2
-- Replace mock source with SQLite.
-- Add history of past attempts.
-- Add category breakdown (traffic signs, rules, penalties, safety).
+## Phase 2
+- Replace JSON question source with **SQLite using EF Core**.
+- Persist test attempts and answers.
+- Add **Past Attempts page** for logged-in users.
 
-### Optional Phase 3
-- Add login/identity for personalized history.
-- Add SQL Server provider for production hosting.
-- Add admin import flow for question bank updates.
+## Optional Phase 3
+- Expand login system using **ASP.NET Core Identity**.
+- Add **SQL Server provider** for hosted deployment.
+- Add **admin interface** for managing question banks.
 
-## 3) Recommended .NET 10 Architecture
-Use **ASP.NET Core Razor Pages (or Blazor Server)** for fast delivery and low overhead.
+---
 
-Suggested layered structure:
-- `DriverKnowledgeTest.Web` (UI + endpoints/pages)
-- `DriverKnowledgeTest.Application` (use cases/services)
-- `DriverKnowledgeTest.Domain` (entities/value objects/rules)
-- `DriverKnowledgeTest.Infrastructure` (data access: mock, SQLite, SQL Server)
+# 3) Application Architecture
 
-Key design principles:
-- Depend on abstractions in Application/Domain.
-- Keep UI thin: orchestration only.
-- Use repository interfaces so mock and DB providers are swappable.
+The application follows a **classic ASP.NET Core MVC architecture** with supporting services.
+```
+Browser
+↓
+MVC Controllers
+↓
+Application Services
+↓
+Repositories
+↓
+Data Source (JSON → SQLite → SQL Server)
+```
+---
 
-## 4) Screens and UX Flow
-1. **Login (Optional)**
-   - Continue as guest OR login.
-2. **Home**
-   - Start Test button.
-   - Optional links: Past Attempts, Settings.
-3. **Question View**
-   - Question text + 4 options.
-   - Select answer, Next/Previous controls.
-   - Question index navigator (e.g., 1..20).
-   - Submit button on final step (or always available with confirmation).
-4. **Results Summary**
-   - Score (correct/total).
-   - Percentage + pass/fail.
-   - Review incorrect answers.
-   - Retry button.
-5. **Past Attempts (Optional)**
-   - Attempt date, score, percentage, duration.
-   - Optional detailed review per attempt.
+## Key Components
 
-## 5) Domain Model (Initial)
-### Entities
-- `Question`
-  - `Id`, `Text`, `Category`, `Difficulty`, `IsActive`
-- `AnswerOption`
-  - `Id`, `QuestionId`, `Text`, `IsCorrect`
-- `TestAttempt`
-  - `Id`, `UserId?`, `StartedAt`, `CompletedAt`, `Score`, `TotalQuestions`
-- `AttemptAnswer`
-  - `AttemptId`, `QuestionId`, `SelectedOptionId`, `IsCorrect`
-- `User` (optional)
-  - `Id`, `Email/Username`, `PasswordHash` (if local auth)
+### Controllers
+Handle HTTP requests and coordinate application flow.
 
-### Rules
-- A generated test has between 20 and 30 unique questions.
-- Each question has exactly one correct option.
-- Score is calculated at submit time from selected options.
+- `HomeController` – Home page and test start
+- `TestController` – Quiz flow (questions, answers, results)
+- `AccountController` – Optional login / guest access
 
-## 6) Application Services
-- `ITestSessionService`
-  - CreateSession(questionCount)
-  - SaveAnswer(sessionId, questionId, optionId)
-  - GetSessionProgress(sessionId)
-  - Submit(sessionId)
-- `IQuestionProvider`
-  - GetRandomQuestions(count)
-- `IAttemptHistoryService`
-  - ListAttempts(userId or guest token)
-  - GetAttemptDetails(attemptId)
+### Services
+Encapsulate business logic.
 
-## 7) Data Strategy
-### MVP: Mock Data
-- Store a starter question bank in `questions.json`.
-- Load into memory on app startup.
+- `TestSessionService`
+- `ScoringService`
+- `CurrentUserService`
 
-### DB Phase: SQLite
-- EF Core provider: `Microsoft.EntityFrameworkCore.Sqlite`.
-- Migration-driven schema.
-- Keep repository contracts stable to avoid UI changes.
+### Repositories
+Abstract question storage.
 
-### SQL Server Phase (Optional)
-- Add second EF Core provider via config switch:
-  - `UseSqlite(...)` for local dev
-  - `UseSqlServer(...)` for hosted environment
+- `IQuestionRepository`
+- `JsonQuestionRepository`
+- (Future) `EfQuestionRepository`
 
-## 8) Suggested Milestones
-### Milestone 1 - Skeleton
-- Create solution + projects.
-- Wire DI and base layout.
-- Add mock question provider.
+### Views
+Razor pages responsible for rendering UI.
 
-### Milestone 2 - Knowledge Test Flow
-- Implement home -> question -> results.
-- Add navigation and answer persistence.
-- Add scoring and summary page.
+---
 
-### Milestone 3 - Persistence
-- Add SQLite + EF Core models.
-- Store attempts and answers.
-- Add Past Attempts screen.
+# 4) Project Structure
+```
+DriverQuiz.Web
+│
+├── Controllers
+│ ├── HomeController
+│ ├── TestController
+│ └── AccountController
+│
+├── Models
+│ ├── Question
+│ ├── TestAttempt
+│ └── AttemptAnswer
+│
+├── Services
+│ ├── IQuestionRepository
+│ ├── JsonQuestionRepository
+│ ├── TestSessionService
+│ ├── ScoringService
+│ └── CurrentUserService
+│
+├── ViewModels
+│ ├── StartTestViewModel
+│ ├── QuestionViewModel
+│ ├── ResultsViewModel
+│ └── LoginViewModel
+│
+├── Views
+│ ├── Home
+│ ├── Test
+│ ├── Account
+│ └── Shared
+│
+└── wwwroot
+└── data
+└── questions.seed.json
+```
+---
 
-### Milestone 4 - Optional Identity
-- Add ASP.NET Core Identity or minimal auth.
-- Associate attempts with users.
+# 5) Screens and UX Flow
 
-### Milestone 5 - Hardening
-- Validation, error handling, logging.
-- Add unit/integration tests.
-- Seed/expand question bank.
+### 1. Login (Optional)
+Users may:
+- Enter a display name
+- Continue as **Guest**
 
-## 9) Testing Plan
-- **Unit tests**
-  - Score calculation logic.
-  - Random question selection (count/uniqueness).
-- **Integration tests**
-  - Full test submission flow.
-  - Persistence of attempts and retrieval.
-- **UI/smoke tests**
-  - Start test, navigate, submit, view results.
+Session stores current user identity.
 
-## 10) Non-Functional Requirements
-- Fast startup for local training use.
-- Maintainable architecture for easy DB swap.
-- Secure handling of credentials (if login added).
-- Accessibility basics: keyboard navigation, semantic labels.
+### 2. Home
+Options:
+- Start Test
+- Logout
 
-## 11) Initial Backlog (Implementation-Ready)
-1. Create solution and 4-project structure.
-2. Add question JSON seed and loader.
-3. Build Home + Question + Results pages.
-4. Implement session state (in-memory for MVP).
-5. Implement scoring logic and result DTO.
-6. Add SQLite persistence for attempts.
-7. Build Past Attempts page.
-8. Add authentication (optional).
+### 3. Question View
+Displays:
+- Question text
+- Four answer options
+- Navigation controls (Next / Previous)
 
-## 12) Recommended NuGet Packages (Early)
-- `Microsoft.EntityFrameworkCore`
-- `Microsoft.EntityFrameworkCore.Sqlite`
-- `Microsoft.EntityFrameworkCore.Design`
-- `FluentValidation` (optional)
-- `Serilog.AspNetCore` (optional)
-- `xunit` + `Microsoft.NET.Test.Sdk` + `FluentAssertions`
+Answers are stored in session.
 
-## 13) Definition of Done for MVP
-- User can complete a 20-30 question test.
-- User can move backward/forward without losing answers.
-- App shows final score and incorrect answers.
-- At least basic tests pass for scoring and question generation.
-- Project runs locally with documented setup.
+### 4. Results Summary
+Displays:
+- Total score
+- Percentage
+- Incorrect questions with correct answers
+- Option to start a new test
+
+### 5. Past Attempts (Future)
+Displays:
+- Attempt date
+- Score
+- Percentage
+- Detailed review
+
+---
+
+# 6) Domain Model (Current)
+
+## Entities
+
+### Question
+- `Id`
+- `Text`
+- `ChoiceA`
+- `ChoiceB`
+- `ChoiceC`
+- `ChoiceD`
+- `CorrectChoiceIndex`
+- `Explanation`
+- `Category`
+- `IsActive`
+
+### TestAttempt (future persistence)
+- `Id`
+- `UserId`
+- `UserDisplayName`
+- `StartedAt`
+- `CompletedAt`
+- `Score`
+- `Percentage`
+
+### AttemptAnswer (future persistence)
+- `AttemptId`
+- `QuestionId`
+- `SelectedChoiceIndex`
+- `IsCorrect`
+
+### AppUser
+- `Id`
+- `DisplayName`
+- `IsGuest`
+
+---
+
+# 7) Data Strategy
+
+## MVP
+Questions stored in:
+`wwwroot/data/questions.seed.json`
+
+Loaded through:
+`JsonQuestionRepository`
+
+## Future Database Layer
+
+EF Core will be used to support:
+
+### SQLite
+For local persistence.
+
+### SQL Server
+For hosted deployment.
+
+Repository interface allows switching providers without UI changes.
+
+---
+
+# 8) Session Management
+
+The app uses **ASP.NET Core Session State** to maintain the current quiz.
+
+Session contains:
+```
+TestSession
+├─ AttemptId
+├─ StartedAt
+├─ QuestionIds[]
+├─ Answers[QuestionId → SelectedOption]
+└─ CurrentIndex
+```
+This allows:
+- navigation between questions
+- saving answers before submission
+
+---
+
+# 9) Suggested Milestones
+
+## Milestone 1 – MVC Skeleton
+- Create MVC solution
+- Add layout and routing
+- Implement question JSON loader
+
+## Milestone 2 – Quiz Flow
+- Implement Start Test
+- Question navigation
+- Answer persistence
+- Results page
+
+## Milestone 3 – Persistence
+- Add SQLite with EF Core
+- Store attempts and answers
+- Build Past Attempts screen
+
+## Milestone 4 – Authentication
+- Replace display-name login with Identity
+- Link attempts to user accounts
+
+## Milestone 5 – Hardening
+- Logging
+- Validation
+- Expand question bank
+- Improve UI
+
+---
+
+# 10) Testing Plan
+
+## Unit Tests
+- Score calculation
+- Random question selection
+
+## Integration Tests
+- Full quiz workflow
+- Session handling
+- Results generation
+
+## Manual UI Testing
+- Start test
+- Navigate questions
+- Submit test
+- Verify scoring
+
+---
+
+# 11) Non-Functional Requirements
+
+- Fast startup
+- Minimal dependencies
+- Easily replaceable data providers
+- Maintainable MVC structure
+- Accessible UI (keyboard navigation, semantic labels)
+
+---
+
+# 12) Recommended NuGet Packages
+
+Core:
+```
+Microsoft.EntityFrameworkCore
+Microsoft.EntityFrameworkCore.Sqlite
+Microsoft.EntityFrameworkCore.Design
+```
+
+Optional:
+```
+FluentValidation
+Serilog.AspNetCore
+```
+
+Testing:
+```
+xunit
+Microsoft.NET.Test.Sdk
+FluentAssertions
+```
+
+# 13) Definition of Done (MVP)
+
+The MVP is complete when:
+- User can login or continue as guest
+- User can take a **20–30 question test**
+- User can move forward/backward without losing answers
+- App displays **score and incorrect answers**
+- Project runs locally with documented setup
